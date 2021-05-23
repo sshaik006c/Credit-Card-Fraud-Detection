@@ -1,5 +1,9 @@
 # Credit-Card-Fraud-Detection
 
+# Contributers:
+Shehnaz Begum Shaik
+Harikiran Madishetti
+
 ## Executive Summary: 
 
 Card fraud is a term used for theft and fraud committed using a payment card, such as debit or credit card as a fraudulent source of funds in the transaction. Technologies have existed since the early 1990s to detect potential fraud. With the help of machine learning we can find the pattern of usual and unusual behavior of client’s transaction to block likely frauds. This project is based on Kaggle competition conducted by IEEE Computational Intelligence Society (IEEE-CIS) to predict whether a transaction is fraudulent. IEEE-CIS works across a variety of AI and ML areas, including deep neural networks, fuzzy systems, evolutionary computation, and swarm intelligence. In this competition they have partnered with the world’s leading payment service company, Vesta Corporation, seeking the best solutions for fraud prevention industry. The goal of this project is to understand the vast features in the dataset and select the features that contribute most to the target variable. For classification problems like fraud detection Decision-tree based Boosting Algorithm work best. Light Gradient Boosting algorithm was the compiled with AUC test validation score of 0.92. The benchmark score from Kaggle i.e., 0.945 helped us compare the models to choose the most efficient one. 
@@ -42,7 +46,7 @@ Analyzing the missing data from the Transaction and identity datasets to underst
 
 ### Correlation:
 
-Analyzed correlation between different features, to identify the highly correlated variables. Since we have 434 features in both datasets, it is tedious to identify correlation between all the variables. Hence, I identified the features with similar percentage of missing values from the missingness plots and grouped them together to identify the correlation between them. The below plot is one of the examples of such plots to identify correlation between variables with similar missingness.
+Analyzed correlation between different features, to identify the highly correlated variables. Since we have 434 features in both datasets, it is tedious to identify correlation between all the variables. Hence, we identified the features with similar percentage of missing values from the missingness plots and grouped them together to identify the correlation between them. The below plot is one of the examples of such plots to identify correlation between variables with similar missingness.
 
 #### Heat map of Variables D11, V1 to V11
 ![image](https://user-images.githubusercontent.com/47012176/119277610-4cc84e80-bbe6-11eb-8f88-b810e466ed37.png)
