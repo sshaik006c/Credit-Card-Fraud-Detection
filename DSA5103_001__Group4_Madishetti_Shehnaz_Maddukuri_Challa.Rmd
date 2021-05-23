@@ -1,0 +1,668 @@
+---
+title: 'DSA-5103 PROJECT '
+author: "Harikiran Madishetti | Meghnath Challa | Vidyadhari Maddukuri | Shehnaz Shaik"
+date: "11/30/2020"
+output:
+  word_document: 
+    df_print: kable
+  pdf_document:
+    df_print: kable
+geometry: margin=0.4in
+fontsize: 11pt
+spacing: double
+font: Calibri
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(Amelia)
+library(mice)
+library(VIM)
+library(gpairs)
+library(GGally)
+library(lattice)
+library(fmsb)
+library(corrplot)
+library(data.table)
+library(dplyr)
+library(Metrics)
+library(MASS)
+library(caret)
+library(elasticnet)
+library(mltools)
+library(earth)
+library(glmnet)
+library(ROCR) 
+library(PRROC)
+library(MLmetrics)
+library(gmodels)
+library(mccr)
+library(car)
+library(rpart)
+library(party)
+library(partykit)
+library(lightgbm)
+library(missMDA)
+library(FactoMineR)
+```
+
+```{r}
+#Importing Test and Train data
+df_identity <-
+  read.csv('train_identity.csv',
+           stringsAsFactors = TRUE,
+           encoding = "latin1")  #Loading train identity data
+df_transaction <-
+  read.csv('train_transaction.csv',
+           stringsAsFactors = TRUE,
+           encoding = "latin1")    #Loading train transaction data
+
+
+df_test_identity <-
+  read.csv('test_identity.csv',
+           stringsAsFactors = TRUE,
+           encoding = "latin1")  #Loading test identity data
+df_test_transaction <-
+  read.csv('test_transaction.csv',
+           stringsAsFactors = TRUE,
+           encoding = "latin1")    #Loading test transaction data
+```
+
+
+```{r}
+#Looking at the data
+str(df_identity)
+str(df_transaction)
+
+glimpse(df_identity)
+glimpse(df_transaction)
+
+#Looking at the summary of the dataset
+summary(df_identity)
+summary(df_transaction)
+```
+
+```{r}
+#Replacing White Spaces with NA values
+for (col in names(df_transaction)) {
+  set(
+    df_transaction,
+    i = which(df_transaction[[col]] %in% c('')),
+    j = col,
+    value = NA
+  )
+}
+
+for (col in names(df_identity)) {
+  set(
+    df_identity,
+    i = which(df_identity[[col]] %in% c('')),
+    j = col,
+    value = NA
+  )
+}
+```
+
+```{r}
+#Missingness of each column
+#Transaction
+missing_transaction <-
+  data.frame(data =  sapply(df_transaction, function(x) {
+    sum(is.na(x))
+  }),
+  col_name = names(df_transaction))
+
+#Identity
+missing_identity <-
+  data.frame(data =  sapply(df_identity, function(x) {
+    sum(is.na(x))
+  }),
+  col_name = names(df_identity))
+
+#Percent of missingness in each column
+#Transaction
+missing_transaction_pct <-
+  data.frame(data =  sapply(df_transaction, function(x) {
+    100 * (sum(is.na(x)) / length(x))
+  }),
+  col_name = names(df_transaction))
+
+#Identity
+missing_identity_pct <-
+  data.frame(data =  sapply(df_identity, function(x) {
+    100 * (sum(is.na(x)) / length(x))
+  }),
+  col_name = names(df_identity))
+```
+
+```{r}
+#missing percentage plot in transaction data
+missing_transaction_pct[missing_transaction_pct$data > 80,] %>% ggplot(aes(x = reorder(col_name,-data), y = data)) +
+  geom_bar(stat = 'identity', fill = 'lightgreen') + labs(x = 'Features', title = 'Percentage of missing values plot', y = '% of missing values') + theme(axis.text.x = element_text(angle = 70, hjust = 1),
+                                                                                                                                                          plot.title = element_text(hjust = 0.5)) + geom_text(aes(label = round(data)),
+                                                                                                                                                                                                              position = position_dodge(width = 0.9),
+                                                                                                                                                                                                              vjust = 0)
+
+#missing percentage plot in identity data
+missing_identity_pct[missing_identity_pct$data > 80,] %>% ggplot(aes(x = reorder(col_name,-data), y = data)) +
+  geom_bar(stat = 'identity', fill = 'lightgreen') + labs(x = 'Features', title = 'Percentage of missing values plot', y = '% of missing values') + theme(axis.text.x = element_text(angle = 70, hjust = 1),
+                                                                                                                                                          plot.title = element_text(hjust = 0.5)) + geom_text(aes(label = round(data)),
+                                                                                                                                                                                                              position = position_dodge(width = 0.9),
+                                                                                                                                                                                                              vjust = 0)
+```
+
+```{r}
+#Identifying the columns with similar missing values
+#Columns with Similar missing transaction data
+for (i in unique(missing_transaction$data)) {
+  col_name <-
+    c(missing_transaction[missing_transaction$data == i,  2])
+  if (length(col_name) > 1) {
+    print("Columns with similar missing values")
+    print(col_name)
+  }
+}
+
+#Columns with Similar missing identity data
+for (i in unique(missing_identity$data)) {
+  col_name <- c(missing_identity[missing_identity$data == i,  2])
+  if (length(col_name) > 1) {
+    print("Columns with similar missing values")
+    print(col_name)
+  }
+}
+
+```
+
+
+```{r}
+
+#HEAT MAPS FOR COLUMNS WITH SIMILAR MISSING DATA
+#for transaction
+
+#from v1 to v11
+match("V1",names(df_transaction)) #find the column number
+no_nulls <- (df_transaction[,c(1,56:66)]) #combine columns
+v1_11 <- no_nulls[complete.cases(no_nulls), ] #remove null values
+heatmap(cor(v1_11))
+
+
+#from v12 to v34
+match("V12",names(df_transaction)) #find the column number
+no_nulls1 <- (df_transaction[,c(1,67:89)]) #combine columns
+v12_34 <- no_nulls1[complete.cases(no_nulls1), ] #remove null values
+heatmap(cor(v12_34))
+
+#from v35 to v52
+match("V35",names(df_transaction)) #find the column number
+no_nulls2 <- (df_transaction[,c(1,90:107)]) #combine columns
+v_35_52 <- no_nulls2[complete.cases(no_nulls2), ] #remove null values
+heatmap(cor(v_35_52))
+
+#from v53 to v74
+match("V53",names(df_transaction)) #find the column number
+no_nulls3 <- (df_transaction[,c(1,108:129)]) #combine columns
+v_53_74 <- no_nulls3[complete.cases(no_nulls3), ] #remove null values
+heatmap(cor(v_53_74))
+
+#from v75 to v94
+match("V94",names(df_transaction)) #find the column number
+no_nulls4 <- (df_transaction[,c(1,109:149)]) #combine columns
+v_75_94 <- no_nulls4[complete.cases(no_nulls4), ] #remove null values
+heatmap(cor(v_75_94))
+
+
+#from v95 to v137
+match("V137",names(df_transaction)) #find the column number
+no_nulls6 <- (df_transaction[,c(1,150:192)]) #combine columns
+v_95_137 <- no_nulls6[complete.cases(no_nulls6), ] #remove null values
+heatmap(cor(v_95_137))
+
+#from v95 to v106
+match("V106",names(df_transaction)) #find the column number
+no_nulls5 <- (df_transaction[,c(1,150:161)]) #combine columns
+v_95_106 <- no_nulls5[complete.cases(no_nulls5), ] #remove null values
+heatmap(cor(v_95_106))
+
+#from v107 to v123
+match("V123",names(df_transaction)) #find the column number
+no_nulls7 <- (df_transaction[,c(1,162:178)]) #combine columns
+v_107_123 <- no_nulls7[complete.cases(no_nulls7), ] #remove null values
+heatmap(cor(v_107_123))
+
+#from v124 to v137
+match("V137",names(df_transaction)) #find the column number
+no_nulls8 <- (df_transaction[,c(1,179:192)]) #combine columns
+v_124_137 <- no_nulls8[complete.cases(no_nulls8), ] #remove null values
+heatmap(cor(v_124_137))
+
+#from v138 to v163
+match("V163",names(df_transaction)) #find the column number
+no_nulls9 <- (df_transaction[,c(1,193:218)]) #combine columns
+v_138_163 <- no_nulls9[complete.cases(no_nulls9), ] #remove null values
+heatmap(cor(v_138_163))
+
+#from v143 to v166
+match("V166",names(df_transaction)) #find the column number
+no_nulls10 <- (df_transaction[,c(1,198:221)]) #combine columns
+v_143_166 <- no_nulls10[complete.cases(no_nulls10), ] #remove null values
+heatmap(cor(v_143_166))
+
+#from v167 to v216
+match("V216",names(df_transaction)) #find the column number
+no_nulls11 <- (df_transaction[,c(1,222:271)]) #combine columns
+v_167_216 <- no_nullS11[complete.cases(no_nulls11), ] #remove null values
+heatmap(cor(v_167_216))
+
+#from v167 to v183
+match("V183",names(df_transaction)) #find the column number
+no_nulls12 <- (df_transaction[,c(1,222:238)]) #combine columns
+v_167_183 <- no_nulls12[complete.cases(no_nulls12), ] #remove null values
+heatmap(cor(v_167_183))
+
+#from v186 to v216
+match("V216",names(df_transaction)) #find the column number
+no_nulls13 <- (df_transaction[,c(1,241:271)]) #combine columns
+v_186_216 <- no_nulls13[complete.cases(no_nulls13), ] #remove null values
+heatmap(cor(v_186_216))
+
+#from v169 to v210
+match("V210",names(df_transaction)) #find the column number
+no_nulls14 <- (df_transaction[,c(1,224:265)]) #combine columns
+v_169_210 <- no_nulls14[complete.cases(no_nulls14), ] #remove null values
+heatmap(cor(v_169_210))
+
+#from v217 to v278
+match("V278",names(df_transaction)) #find the column number
+no_nulls15 <- (df_transaction[,c(1,272:333)]) #combine columns
+v_217_278 <- no_nulls15[complete.cases(no_nulls15), ] #remove null values
+heatmap(cor(v_217_278))
+
+#from v217 to v237
+match("V237",names(df_transaction)) #find the column number
+no_nulls16 <- (df_transaction[,c(1,272:292)]) #combine columns
+v_217_237 <- no_nulls16[complete.cases(no_nulls16), ] #remove null values
+heatmap(cor(v_217_237))
+
+#from v240 to v262
+match("V262",names(df_transaction)) #find the column number
+no_nulls17 <- (df_transaction[,c(1,295:317)]) #combine columns
+v_240_262 <- no_nulls17[complete.cases(no_nulls17), ] #remove null values
+heatmap(cor(v_240_262))
+
+#from v263 to v278
+match("V278",names(df_transaction)) #find the column number
+no_nulls18 <- (df_transaction[,c(1,318:333)]) #combine columns
+v_263_278 <- no_nulls18[complete.cases(no_nulls18), ] #remove null values
+heatmap(cor(v_263_278))
+
+#from v220 to v272
+match("V272",names(df_transaction)) #find the column number
+no_nulls19 <- (df_transaction[,c(1,275:327)]) #combine columns
+v_220_272 <- no_nulls19[complete.cases(no_nulls19), ] #remove null values
+heatmap(cor(v_220_272))
+
+#from v279 to v321
+match("V321",names(df_transaction)) #find the column number
+no_nulls20 <- (df_transaction[,c(1,334:376)]) #combine columns
+v_279_321 <- no_nulls20[complete.cases(no_nulls20), ] #remove null values
+heatmap(cor(v_279_321))
+
+#from v279 to v299
+match("V299",names(df_transaction)) #find the column number
+no_nulls21 <- (df_transaction[,c(1,334:354)]) #combine columns
+v_279_299 <- no_nulls21[complete.cases(no_nulls21), ] #remove null values
+heatmap(cor(v_279_299))
+
+#from v302 to v321
+match("V321",names(df_transaction)) #find the column number
+no_nulls22 <- (df_transaction[,c(1,357:376)]) #combine columns
+v_302_321 <- no_nulls22[complete.cases(no_nulls22), ] #remove null values
+heatmap(cor(v_302_321))
+
+#from v281 to v315
+match("V315",names(df_transaction)) #find the column number
+no_nulls23 <- (df_transaction[,c(1,336:370)]) #combine columns
+v_281_315 <- no_nulls23[complete.cases(no_nulls23), ] #remove null values
+heatmap(cor(v_281_315))
+
+#from v322 to v339
+match("V339",names(df_transaction)) #find the column number
+no_nulls24 <- (df_transaction[,c(1,372:394)]) #combine columns
+v_322_339 <- no_nulls24[complete.cases(no_nulls24), ] #remove null values
+heatmap(cor(v_322_339))
+
+#C-COLUMNS
+#from c1 to c14
+match("C14",names(df_transaction)) #find the column number
+no_nulls25 <- (df_transaction[,c(1,18:31)]) #combine columns
+c_1_14 <- no_nulls25[complete.cases(no_nulls25), ] #remove null values
+heatmap(cor(c_1_14))
+
+#D-COLUMNS
+#from D1 to D15
+match("D15",names(df_transaction)) #find the column number
+no_nulls26 <- (df_transaction[,c(1,32:46)]) #combine columns
+D_1_15 <- no_nulls26[complete.cases(no_nulls26), ] #remove null values
+heatmap(cor(D_1_15))
+
+#M-Column
+#from M1 to M9
+match("M9",names(df_transaction)) #find the column number
+no_nulls27 <- (df_transaction[,c(1,47:55)]) #combine columns
+M_1_9 <- no_nulls27[complete.cases(no_nulls27), ] #remove null values
+heatmap(cor(D_1_15))
+
+#heat map for identity-ID-Column
+#from ID1 to ID38
+match("id_38",names(df_identity)) #find the column number
+no_nulls28 <- (df_identity[,c(1,2:39)]) #combine columns
+ID_1_38 <- no_nulls28[complete.cases(no_nulls28), ] #remove null values
+heatmap(cor(ID_1_38))
+```
+
+
+```{r}
+#Identifying columns with 95% missing identity data
+missing_identity_pct[missing_identity_pct$data > 95,]
+
+#Identifying columns with 90% missing transaction data
+missing_transaction_pct[missing_transaction_pct$data > 90,]
+```
+
+```{r}
+#Joining the transaction and identity data using transaction data
+df_train <- left_join(df_transaction, df_identity)
+#Removing the objects which are not in use
+#remove(df_identity)
+#remove(df_transaction)
+
+#Feature transformation
+df_train$TransactionDT <-   df_train$TransactionDT/86400
+```
+
+```{r}
+#Selecting the below columns to train model based on the correlation heatmap and missingness analysis
+col_vars <- c('TransactionAmt', 'ProductCD', 'card1', 'card2', 'card3', 'card5',
+              'card6', 'addr1', 'addr2', 'dist1', 'dist2', 'P_emaildomain',
+              'R_emaildomain', 'C1', 'C2', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9',
+              'C10', 'C11', 'C12', 'C13', 'C14', 'D1', 'D2', 'D3', 'D4', 'D5',
+              'D10', 'D11', 'D15', 'M1', 'M2', 'M3', 'M4', 'M6', 'M7', 'M8',
+              'M9', 'V1', 'V3', 'V4', 'V6', 'V8', 'V11', 'V13', 'V14', 'V17',
+              'V20', 'V23', 'V26', 'V27', 'V30', 'V36', 'V37', 'V40', 'V41',
+              'V44', 'V47', 'V48', 'V54', 'V56', 'V59', 'V62', 'V65', 'V67',
+              'V68', 'V70', 'V76', 'V78', 'V80', 'V82', 'V86', 'V88', 'V89',
+              'V91', 'V107', 'V108', 'V111', 'V115', 'V117', 'V120', 'V121',
+              'V123', 'V124', 'V127', 'V129', 'V130', 'V136', 'V138', 'V139',
+              'V142', 'V147', 'V156', 'V160', 'V162', 'V165', 'V166', 'V169',
+              'V171', 'V173', 'V175', 'V176', 'V178', 'V180', 'V182', 'V185',
+              'V187', 'V188', 'V198', 'V203', 'V205', 'V207', 'V209', 'V210',
+              'V215', 'V218', 'V220', 'V221', 'V223', 'V224', 'V226', 'V228',
+              'V229', 'V234', 'V235', 'V238', 'V240', 'V250', 'V252', 'V253',
+              'V257', 'V258', 'V260', 'V261', 'V264', 'V266', 'V267', 'V271',
+              'V274', 'V277', 'V281', 'V283', 'V284', 'V285', 'V286', 'V289',
+              'V291', 'V294', 'V296', 'V297', 'V301', 'V303', 'V305', 'V307',
+              'V309', 'V310', 'V314', 'V320', 'id_01', 'id_02', 'id_03', 'id_04',
+              'id_05', 'id_06', 'id_09', 'id_10', 'id_11', 'id_12', 'id_13',
+              'id_15', 'id_16', 'id_17', 'id_18', 'id_19', 'id_20', 'id_28',
+              'id_29', 'id_31', 'id_35', 'id_36', 'id_37', 'id_38', 'DeviceType',
+              'DeviceInfo', 'isFraud')
+d <- df_train[, col_vars]
+```
+
+```{r}
+#Missing Value Imputation
+#Looking for missing values in both transaction and identity dataset
+missing_data <-
+  data.frame(data =  sapply(d, function(x) {
+    100 * (sum(is.na(x)) / length(x))
+  }),
+  col_name = names(d))
+
+#Names of the columns with missing values
+missing_data[missing_data$data > 0, 2]
+
+#Missing value imputation based on grouped categories (Stratified Imputation)
+imputed <-
+  matchImpute(d, variable =  missing_data[missing_data$data > 0, 2], match_var = names(d))
+
+d <- imputed[, 1:189]
+```
+
+```{r}
+#Selecting Categorical Variables
+cat_vars <- names(d)[sapply(d, is.logical)]
+
+#Looking number of unique values of categorical variables
+sapply(d[cat_vars], function(x) length(unique(x))) %>% sort(decreasing=T) %>% data.frame
+
+#Converting categorical variables into integers (Label Encoding)
+d[, cat_vars] <- lapply(d[, cat_vars], as.integer)
+```
+
+```{r}
+#Test Data
+df_test <- left_join(df_test_transaction, df_test_identity)
+
+test_col_vars <- c('TransactionAmt', 'ProductCD', 'card1', 'card2', 'card3', 'card5',
+              'card6', 'addr1', 'addr2', 'dist1', 'dist2', 'P_emaildomain',
+              'R_emaildomain', 'C1', 'C2', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9',
+              'C10', 'C11', 'C12', 'C13', 'C14', 'D1', 'D2', 'D3', 'D4', 'D5',
+              'D10', 'D11', 'D15', 'M1', 'M2', 'M3', 'M4', 'M6', 'M7', 'M8',
+              'M9', 'V1', 'V3', 'V4', 'V6', 'V8', 'V11', 'V13', 'V14', 'V17',
+              'V20', 'V23', 'V26', 'V27', 'V30', 'V36', 'V37', 'V40', 'V41',
+              'V44', 'V47', 'V48', 'V54', 'V56', 'V59', 'V62', 'V65', 'V67',
+              'V68', 'V70', 'V76', 'V78', 'V80', 'V82', 'V86', 'V88', 'V89',
+              'V91', 'V107', 'V108', 'V111', 'V115', 'V117', 'V120', 'V121',
+              'V123', 'V124', 'V127', 'V129', 'V130', 'V136', 'V138', 'V139',
+              'V142', 'V147', 'V156', 'V160', 'V162', 'V165', 'V166', 'V169',
+              'V171', 'V173', 'V175', 'V176', 'V178', 'V180', 'V182', 'V185',
+              'V187', 'V188', 'V198', 'V203', 'V205', 'V207', 'V209', 'V210',
+              'V215', 'V218', 'V220', 'V221', 'V223', 'V224', 'V226', 'V228',
+              'V229', 'V234', 'V235', 'V238', 'V240', 'V250', 'V252', 'V253',
+              'V257', 'V258', 'V260', 'V261', 'V264', 'V266', 'V267', 'V271',
+              'V274', 'V277', 'V281', 'V283', 'V284', 'V285', 'V286', 'V289',
+              'V291', 'V294', 'V296', 'V297', 'V301', 'V303', 'V305', 'V307',
+              'V309', 'V310', 'V314', 'V320', 'id.01', 'id.02', 'id.03', 'id.04',
+              'id.05', 'id.06', 'id.09', 'id.10', 'id.11', 'id.12', 'id.13',
+              'id.15', 'id.16', 'id.17', 'id.18', 'id.19', 'id.20', 'id.28',
+              'id.29', 'id.31', 'id.35', 'id.36', 'id.37', 'id.38', 'DeviceType',
+              'DeviceInfo')
+
+df_test <- df_test[, test_col_vars]
+
+#Missing Value Imputation
+#Looking for missing values in both transaction and identity dataset
+missing_data_test <-
+  data.frame(data =  sapply(df_test, function(x) {
+    100 * (sum(is.na(x)) / length(x))
+  }),
+  col_name = names(df_test))
+
+#Names of the columns with missing values
+missing_data_test[missing_data_test$data > 0, 2]
+
+#Missing value imputation based on grouped categories (Stratified Imputation)
+imputed <-
+  matchImpute(df_test, variable =  missing_data_test[missing_data_test$data > 0, 2], match_var = names(df_test))
+
+df_test <- imputed[, 1:189]
+
+#Selecting Categorical Variables
+test_cat_vars <- names(df_test)[sapply(df_test, is.logical)]
+
+#Converting categorical variables into integers (Label Encoding)
+df_test[, test_cat_vars] <- lapply(df_test[, test_cat_vars], as.integer)
+
+dim(df_test)
+```
+
+```{r}
+#Logistic Regression Model
+lrModel <- glm(data = d, isFraud ~ . ,
+               family = "binomial")
+#Summary of Logistic Model
+summary(lrModel)
+
+#Confusion matrix of the model
+confusionMatrix(as.factor(as.numeric(lrModel$fitted.values > 0.5)), reference = as.factor(lrModel$y))
+```
+
+```{r}
+#Light GBM Model
+
+#Setting Parameters
+lgb_params <- list(objective = "binary",
+                   metric = "auc",
+                   boosting_type = "gbdt",
+                   boost_from_average = "false",
+                   learning_rate = 0.005,
+                   num_leaves = 192,
+                   min_gain_to_split = 0,
+                   feature_fraction = 0.3,
+                   bagging_freq = 1,
+                   bagging_fraction = 0.7,
+                   min_data_in_leaf = 100,
+                   lambda_l1 = 0,
+                   lambda_l2 = 0
+)
+
+#Splitting the data into train and validation set
+set.seed(42)
+train.idx <- sample(nrow(d), 0.75*nrow(d))
+
+dtrain <- lgb.Dataset(data=as.matrix(d[train.idx, -189]), label=d[train.idx, 189], free_raw_data=F)
+dvalid <- lgb.Dataset(data=as.matrix(d[-train.idx, -189 ]), label=d[-train.idx, 189], free_raw_data=F)
+
+#Model
+lgbModel <- lgb.train(param = lgb_params,
+                    data = dtrain,
+                    valids = list(train=dtrain, valid=dvalid),
+                    nrounds = 1000,
+                    early_stopping_rounds = 200,
+                    eval_freq = 200,
+                    folds = 5,
+                    seed = 42)
+
+#Model Summary
+lgbModel
+```
+
+
+```{r}
+#LGBM Model Evaluation using complete train data
+pred <- predict(lgbModel, as.matrix(d[, -189]))
+predClass <- as.integer(pred > 0.5)
+trueVal <- d$isFraud
+
+predVals <-
+  data.frame(trueVal = trueVal,
+             predClass = predClass,
+             X1 = pred)
+
+
+#Cross Tabulation
+CrossTable(predClass, trueVal, chisq = T)
+
+#Confusion Matrix and Statistics
+confusionMatrix(as.factor(predClass), reference = as.factor(trueVal))
+
+#Logloss
+LogLoss(predClass, trueVal)
+
+#Accuracy of model
+Metrics::accuracy(trueVal, predClass)
+
+# ROC Curve and AUROC
+ROC_AUC <-
+  roc.curve(scores.class0 = pred,
+            weights.class0 = trueVal,
+            curve = TRUE)
+
+plot(ROC_AUC,
+     main = 'ROC Curve',
+     xlab = '1 - Specificity',
+     ylab = 'Sensitivity')
+
+# Precision-Recall Curve and AUPRC
+PR_AUC <-
+  pr.curve(scores.class0 = pred,
+           weights.class0 = trueVal,
+           curve = TRUE)
+
+plot(PR_AUC,
+     main = 'Precision-Recall Curve',
+     xlab = 'Recall (True Positive Rate)',
+     ylab = 'Precision (Positive Predicted Value)')
+
+#F1 Score
+F1_Score(trueVal, predClass)
+  
+#Average Accuracy vs Cutoff Graph
+pred1 <- prediction(pred, trueVal)
+perf <- performance(pred1, "acc")
+plot(
+  perf,
+  avg = "vertical",
+  spread.estimate = "boxplot",
+  show.spread.at = seq(0.1, 0.9, by = 0.1),
+  main = 'Average Accuracy vs. Cutoff Graph'
+)
+
+
+#K-S Chart
+predVals$group <- cut(predVals$X1, seq(1, 0, -.1), include.lowest = T)
+xtab <- table(predVals$group, predVals$trueVal)
+
+#xtab
+#make empty dataframe
+KS <- data.frame(
+  Group = numeric(10),
+  CumPct0 = numeric(10),
+  CumPct1 = numeric(10),
+  Dif = numeric(10)
+)
+
+#fill data frame with information: Group ID,
+#Cumulative % of 0's, of 1's and Difference
+for (i in 1:10) {
+  KS$Group[i] <- i
+  KS$CumPct0[i] <- sum(xtab[1:i, 1]) / sum(xtab[, 1])
+  KS$CumPct1[i] <- sum(xtab[1:i, 2]) / sum(xtab[, 2])
+  KS$Dif[i] <- abs(KS$CumPct0[i] - KS$CumPct1[i])
+}
+
+#KS Statistic
+ks_statistic <- round(KS[KS$Dif == max(KS$Dif), ][1, 4] * 100, 2)
+
+maxGroup <- KS[KS$Dif == max(KS$Dif), ][1, 1]
+#and the K-S chart
+ggplot(data = KS) +
+  geom_line(aes(Group, CumPct0), color = "blue") +
+  geom_line(aes(Group, CumPct1), color = "red") +
+  geom_segment(
+    x = maxGroup,
+    xend = maxGroup,
+    y = KS$CumPct0[maxGroup],
+    yend = KS$CumPct1[maxGroup]
+  ) +
+  geom_label(
+    label = paste(ks_statistic, '%', sep = ''),
+    x = maxGroup,
+    y = (KS$CumPct0[maxGroup] + KS$CumPct1[maxGroup]) / 2
+  ) +
+  labs(title = "KOLMOGOROV-SMIRNOV CHART", x = "DECILES", y = "CUMULATIVE PERCENT")
+
+```
+
+
+```{r}
+predProb <- predict(lgbModel, as.matrix(df_test))
+
+final <- data.frame(TransactionID = df_test_transaction[,1], isFraud = predProb)
+
+#File submitted to kaggle competition 
+write.csv(final, 'submission.csv', row.names = FALSE, quote = FALSE)
+```
