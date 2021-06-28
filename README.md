@@ -1,9 +1,8 @@
-# Credit-Card-Fraud-Detection
+# Credit Card Fraud Detection
 
 # Contributers:
+Harikiran M
 Shehnaz Begum Shaik
-
-Harikiran Madishetti
 
 ## Executive Summary: 
 
