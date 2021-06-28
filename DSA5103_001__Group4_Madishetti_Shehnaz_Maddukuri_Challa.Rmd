@@ -1,6 +1,6 @@
 ---
 title: 'DSA-5103 PROJECT '
-author: "Harikiran Madishetti | Meghnath Challa | Vidyadhari Maddukuri | Shehnaz Shaik"
+author: "Harikiran M | Shehnaz Shaik"
 date: "11/30/2020"
 output:
   word_document: 
